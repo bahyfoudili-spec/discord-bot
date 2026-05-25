@@ -22,9 +22,7 @@ function trackStat(guildId, type, staffId = null) {
   if (type === 'total') data[guildId].total++;
   if (type === 'claimed') {
     data[guildId].claimed++;
-    if (staffId) {
-      data[guildId].staff[staffId] = (data[guildId].staff[staffId] || 0) + 1;
-    }
+    if (staffId) data[guildId].staff[staffId] = (data[guildId].staff[staffId] || 0) + 1;
   }
   if (type === 'closed') data[guildId].closed++;
   saveStats(data);
@@ -49,7 +47,7 @@ module.exports = {
       }
 
       const ticketChannel = await guild.channels.create({
-        name: `ticket-${user.username.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)}`,
+        name: `ticket-${user.username.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20) || user.id}`,
         type: ChannelType.GuildText,
         topic: `ticket-${user.id}`,
         permissionOverwrites: [
@@ -71,40 +69,18 @@ module.exports = {
         .setFooter({ text: `ID: ${user.id}` })
         .setTimestamp();
 
-      // الأزرار - صف أول
       const row1 = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId(`ticket_claim_${supportRoleId}_${adminRoleId}`)
-          .setLabel('✅ استلام')
-          .setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-          .setCustomId('ticket_rename')
-          .setLabel('✏️ تغيير الاسم')
-          .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-          .setCustomId(`ticket_ping_owner`)
-          .setLabel('📣 مناداة صاحب السيرفر')
-          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`ticket_claim_${supportRoleId}_${adminRoleId}`).setLabel('✅ استلام').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('ticket_rename').setLabel('✏️ تغيير الاسم').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId('ticket_ping_owner').setLabel('📣 مناداة صاحب السيرفر').setStyle(ButtonStyle.Secondary),
       );
 
-      // الأزرار - صف ثاني
       const row2 = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId(`ticket_ping_admin_${adminRoleId}`)
-          .setLabel('🔔 مناداة الإدارة')
-          .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-          .setCustomId('ticket_close_btn')
-          .setLabel('🔒 إغلاق التذكرة')
-          .setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId(`ticket_ping_admin_${adminRoleId}`).setLabel('🔔 مناداة الإدارة').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('ticket_close_btn').setLabel('🔒 إغلاق التذكرة').setStyle(ButtonStyle.Danger),
       );
 
-      await ticketChannel.send({
-        content: `${user} <@&${supportRoleId}>`,
-        embeds: [embed],
-        components: [row1, row2]
-      });
-
+      await ticketChannel.send({ content: `${user} <@&${supportRoleId}>`, embeds: [embed], components: [row1, row2] });
       trackStat(interaction.guild.id, 'total');
       await interaction.reply({ content: `✅ تم إنشاء تذكرتك! ${ticketChannel}`, ephemeral: true });
       return;
@@ -117,22 +93,27 @@ module.exports = {
       const adminRoleId = parts[1] || parts[0];
       const member = interaction.member;
 
-      // تحقق إن الشخص عنده رول الدعم أو الإدارة
       const hasRole = member.roles.cache.has(supportRoleId) || member.roles.cache.has(adminRoleId) || member.permissions.has(PermissionFlagsBits.Administrator);
       if (!hasRole) {
         return interaction.reply({ content: '❌ فقط فريق الدعم يقدر يستلم التذكرة!', ephemeral: true });
       }
 
-      // امنع الكل من الكتابة عدا المستلم وصاحب التذكرة
       const ticketOwnerId = interaction.channel.topic?.replace('ticket-', '');
-      
-      await interaction.channel.permissionOverwrites.set([
+
+      // بناء الصلاحيات بشكل آمن
+      const overwrites = [
         { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
         { id: member.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
-        { id: ticketOwnerId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
         { id: supportRoleId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory], deny: [PermissionFlagsBits.SendMessages] },
         { id: adminRoleId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] },
-      ]);
+      ];
+
+      // أضف صاحب التذكرة فقط لو الـ ID موجود
+      if (ticketOwnerId && ticketOwnerId !== member.id) {
+        overwrites.push({ id: ticketOwnerId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory] });
+      }
+
+      await interaction.channel.permissionOverwrites.set(overwrites);
 
       const embed = new EmbedBuilder()
         .setColor('#00FF00')
@@ -145,18 +126,11 @@ module.exports = {
 
     // ─── تغيير اسم التذكرة ───────────────────────────────────────────────
     if (interaction.isButton() && interaction.customId === 'ticket_rename') {
-      const modal = new ModalBuilder()
-        .setCustomId('ticket_rename_modal')
-        .setTitle('✏️ تغيير اسم التذكرة');
-
+      const modal = new ModalBuilder().setCustomId('ticket_rename_modal').setTitle('✏️ تغيير اسم التذكرة');
       const input = new TextInputBuilder()
-        .setCustomId('new_name')
-        .setLabel('الاسم الجديد')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('ticket-مشكلتي')
-        .setMaxLength(50)
-        .setRequired(true);
-
+        .setCustomId('new_name').setLabel('الاسم الجديد')
+        .setStyle(TextInputStyle.Short).setPlaceholder('ticket-مشكلتي')
+        .setMaxLength(50).setRequired(true);
       modal.addComponents(new ActionRowBuilder().addComponents(input));
       await interaction.showModal(modal);
       return;
@@ -166,7 +140,6 @@ module.exports = {
     if (interaction.isModalSubmit() && interaction.customId === 'ticket_rename_modal') {
       const newName = interaction.fields.getTextInputValue('new_name')
         .toLowerCase().replace(/[^a-z0-9\u0600-\u06FF\-]/g, '-').slice(0, 50);
-      
       await interaction.channel.setName(`ticket-${newName}`);
       await interaction.reply({
         embeds: [new EmbedBuilder().setColor('#00FF00').setDescription(`✅ تم تغيير اسم التذكرة لـ **ticket-${newName}**`)]
@@ -177,18 +150,14 @@ module.exports = {
     // ─── مناداة صاحب السيرفر ─────────────────────────────────────────────
     if (interaction.isButton() && interaction.customId === 'ticket_ping_owner') {
       const owner = await interaction.guild.fetchOwner();
-      await interaction.reply({
-        content: `${owner} 👑 تم مناداتك في تذكرة دعم!`,
-      });
+      await interaction.reply({ content: `${owner} 👑 تم مناداتك في تذكرة دعم!` });
       return;
     }
 
     // ─── مناداة الإدارة ───────────────────────────────────────────────────
     if (interaction.isButton() && interaction.customId.startsWith('ticket_ping_admin_')) {
       const adminRoleId = interaction.customId.replace('ticket_ping_admin_', '');
-      await interaction.reply({
-        content: `<@&${adminRoleId}> 🔔 مطلوب في تذكرة دعم!`,
-      });
+      await interaction.reply({ content: `<@&${adminRoleId}> 🔔 مطلوب في تذكرة دعم!` });
       return;
     }
 
@@ -196,13 +165,11 @@ module.exports = {
     if (interaction.isButton() && interaction.customId === 'ticket_close_btn') {
       try {
         await interaction.deferUpdate();
-        const embed = new EmbedBuilder()
-          .setColor('#FF0000')
-          .setDescription('🔒 سيتم إغلاق هذه التذكرة خلال 5 ثواني...');
+        const embed = new EmbedBuilder().setColor('#FF0000').setDescription('🔒 سيتم إغلاق هذه التذكرة خلال 5 ثواني...');
         await interaction.channel.send({ embeds: [embed] });
         setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
       } catch (e) {
-        interaction.channel.delete().catch(() => {});
+        interaction.channel?.delete().catch(() => {});
       }
       return;
     }
