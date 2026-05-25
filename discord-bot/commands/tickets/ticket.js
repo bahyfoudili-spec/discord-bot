@@ -10,9 +10,7 @@ module.exports = {
     .addSubcommand(sub =>
       sub.setName('setup').setDescription('إعداد نظام التذاكر في هذا الشانيل')
          .addRoleOption(opt => opt.setName('support_role').setDescription('رول الدعم').setRequired(true))
-    )
-    .addSubcommand(sub =>
-      sub.setName('close').setDescription('إغلاق التذكرة الحالية')
+         .addRoleOption(opt => opt.setName('admin_role').setDescription('رول الإدارة').setRequired(true))
     )
     .addSubcommand(sub =>
       sub.setName('add').setDescription('إضافة عضو للتذكرة')
@@ -26,6 +24,7 @@ module.exports = {
     // ─── Setup ────────────────────────────────────────────────────────────
     if (sub === 'setup') {
       const supportRole = interaction.options.getRole('support_role');
+      const adminRole = interaction.options.getRole('admin_role');
 
       const embed = new EmbedBuilder()
         .setColor('#5865F2')
@@ -35,7 +34,7 @@ module.exports = {
 
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-          .setCustomId(`ticket_open_${supportRole.id}`)
+          .setCustomId(`ticket_open_${supportRole.id}_${adminRole.id}`)
           .setLabel('فتح تذكرة 🎫')
           .setStyle(ButtonStyle.Primary)
       );
@@ -44,31 +43,15 @@ module.exports = {
       await interaction.reply({ content: '✅ تم إعداد نظام التذاكر!', ephemeral: true });
     }
 
-    // ─── Close ────────────────────────────────────────────────────────────
-    if (sub === 'close') {
-      if (!interaction.channel.name.startsWith('ticket-')) {
-        return interaction.reply({ content: '❌ هذا الأمر يشتغل فقط في شانيل التذكرة!', ephemeral: true });
-      }
-
-      const embed = new EmbedBuilder()
-        .setColor('#FF0000')
-        .setDescription('🔒 سيتم إغلاق هذه التذكرة خلال 5 ثواني...');
-
-      await interaction.reply({ embeds: [embed] });
-      setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
-    }
-
     // ─── Add ─────────────────────────────────────────────────────────────
     if (sub === 'add') {
       if (!interaction.channel.name.startsWith('ticket-')) {
         return interaction.reply({ content: '❌ هذا الأمر يشتغل فقط في شانيل التذكرة!', ephemeral: true });
       }
-
       const user = interaction.options.getMember('user');
       await interaction.channel.permissionOverwrites.create(user, {
         ViewChannel: true, SendMessages: true
       });
-
       await interaction.reply({
         embeds: [new EmbedBuilder().setColor('#00FF00').setDescription(`✅ تم إضافة ${user} للتذكرة!`)]
       });
