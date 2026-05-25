@@ -50,4 +50,18 @@ for (const file of eventFiles) {
   }
 }
 
+client.on('error', error => {
+  console.error('❌ Client error:', error.message);
+});
+
+process.on('unhandledRejection', error => {
+  console.error('❌ Unhandled rejection:', error.message);
+});
+
+client.login(process.env.DISCORD_TOKEN);
+  } else {
+    client.on(event.name, (...args) => event.execute(...args, client));
+  }
+}
+
 client.login(process.env.DISCORD_TOKEN);
