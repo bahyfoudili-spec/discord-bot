@@ -30,11 +30,16 @@ module.exports = {
 
     // ─── Close Ticket Button ──────────────────────────────────────────────
     if (interaction.customId === 'ticket_close_btn') {
-      const embed = new EmbedBuilder()
-        .setColor('#FF0000')
-        .setDescription('🔒 سيتم إغلاق هذه التذكرة خلال 5 ثواني...');
-      await interaction.reply({ embeds: [embed] });
-      setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
+      try {
+        await interaction.deferUpdate();
+        const embed = new EmbedBuilder()
+          .setColor('#FF0000')
+          .setDescription('🔒 سيتم إغلاق هذه التذكرة خلال 5 ثواني...');
+        await interaction.channel.send({ embeds: [embed] });
+        setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
+      } catch (e) {
+        interaction.channel.delete().catch(() => {});
+      }
     }
   },
 };
