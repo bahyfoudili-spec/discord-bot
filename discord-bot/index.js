@@ -59,9 +59,3 @@ process.on('unhandledRejection', error => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
-  } else {
-    client.on(event.name, (...args) => event.execute(...args, client));
-  }
-}
-
-client.login(process.env.DISCORD_TOKEN);
