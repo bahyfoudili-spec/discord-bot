@@ -1,18 +1,9 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const https = require('https');
 
-function fetchServerStatus(ip) {
-  return new Promise((resolve, reject) => {
-    const url = `https://api.mcsrvstat.us/2/${encodeURIComponent(ip)}`;
-    https.get(url, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try { resolve(JSON.parse(data)); }
-        catch { reject(new Error('فشل تحليل البيانات')); }
-      });
-    }).on('error', reject);
-  });
+async function fetchServerStatus(ip) {
+  const res = await fetch(`https://api.mcstatus.io/v2/status/java/${encodeURIComponent(ip)}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
 }
 
 module.exports = {
@@ -46,15 +37,15 @@ module.exports = {
         .setDescription(`**\`${ip}\`**`)
         .addFields(
           { name: '👥 اللاعبين', value: `${data.players?.online ?? 0} / ${data.players?.max ?? 0}`, inline: true },
-          { name: '📌 الإصدار', value: data.version ?? 'غير معروف', inline: true },
+          { name: '📌 الإصدار', value: data.version?.name_clean ?? 'غير معروف', inline: true },
           { name: '📊 الحالة', value: '🟢 أونلاين', inline: true },
-          { name: '📝 MOTD', value: data.motd?.clean?.[0] ?? 'لا يوجد', inline: false },
+          { name: '📝 MOTD', value: data.motd?.clean ?? 'لا يوجد', inline: false },
         )
-        .setFooter({ text: 'mcsrvstat.us', iconURL: interaction.guild.iconURL() })
+        .setFooter({ text: 'mcstatus.io' })
         .setTimestamp();
 
       if (data.players?.list?.length > 0) {
-        embed.addFields({ name: '🎮 اللاعبين الحاليين', value: data.players.list.slice(0, 10).join(', '), inline: false });
+        embed.addFields({ name: '🎮 اللاعبين الحاليين', value: data.players.list.slice(0, 10).map(p => p.name_clean).join(', '), inline: false });
       }
 
       await interaction.editReply({ embeds: [embed] });
