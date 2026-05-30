@@ -1,0 +1,14 @@
+{
+  "name": "logs-bot",
+  "version": "1.0.0",
+  "description": "بوت لوقات ماينكرافت وديسكورد",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.15.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}
